@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>TypeSpeed</title>
+<style>
+:root{--bg:#2b2d31;--sub:#6b7078;--text:#d7d5cc;--main:#f0b429;--err:#e5484d;--extra:#93343a;--panel:#232528;--fs:36px}
+body[data-theme="ocean"]{--bg:#0f1b2b;--sub:#48607c;--text:#cfe0f2;--main:#4fd1c5;--err:#f56565;--extra:#8a3535;--panel:#0b1522}
+body[data-theme="paper"]{--bg:#ecebe4;--sub:#a9a79c;--text:#2e2e2a;--main:#d9480f;--err:#c92a2a;--extra:#e59a9a;--panel:#dfded6}
+body[data-theme="matrix"]{--bg:#0b0f0b;--sub:#35543a;--text:#b9e4be;--main:#3ddc5a;--err:#ff5c5c;--extra:#8a3030;--panel:#070a07}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:ui-monospace,"SF Mono",Menlo,Monaco,monospace;
+  -webkit-user-select:none;user-select:none;cursor:default;overflow:hidden;transition:background .2s}
+#app{height:100%;display:flex;flex-direction:column;max-width:1100px;margin:0 auto;padding:10px 40px 22px}
+header{display:flex;align-items:center;justify-content:space-between;height:52px}
+.logo{font-size:24px;font-weight:700;letter-spacing:-1px;color:var(--text)}
+.logo b{color:var(--main)}
+.hbtns{display:flex;gap:6px}
+button{font:inherit;font-size:13px;color:var(--sub);background:none;border:0;padding:6px 10px;border-radius:7px;cursor:pointer;transition:color .12s,background .12s}
+button:hover{color:var(--text)}
+button.on{color:var(--main)}
+#config{display:flex;justify-content:center;margin-top:8px}
+.bar{display:flex;align-items:center;gap:2px;background:var(--panel);border-radius:10px;padding:4px 8px;flex-wrap:wrap;justify-content:center}
+.sep{width:3px;height:18px;border-radius:2px;background:var(--bg);margin:0 8px}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;min-height:0}
+.fade{transition:opacity .25s}
+body.typing .fade{opacity:0;pointer-events:none}
+body.typing{cursor:none}
+#live{display:flex;justify-content:center;gap:28px;color:var(--main);font-size:26px;height:38px;padding-left:.3em;opacity:0;transition:opacity .15s}
+body.typing #live{opacity:1}
+#live .dim{color:var(--sub)}
+#test{font-size:var(--fs);max-width:44ch;width:100%;margin:0 auto}
+#wordsWrap{position:relative;overflow:hidden}
+#words{position:relative;display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;transition:transform .12s}
+.br{flex-basis:100%;height:0}
+.word{margin:.25em .3em;line-height:1.3em;border-bottom:2px solid transparent}
+.word.bad{border-bottom-color:var(--err)}
+.l{color:var(--sub)}
+.l.ok{color:var(--text)}
+.l.no{color:var(--err)}
+.l.ex{color:var(--extra)}
+#caret{position:absolute;width:3px;height:1.25em;border-radius:2px;background:var(--main);left:0;top:0;transition:left .08s linear,top .08s linear}
+#caret.blink{animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+#hint{height:24px;margin-top:14px;text-align:center;font-size:13px;color:var(--err)}
+#restartRow{display:flex;justify-content:center;margin-top:6px}
+footer{text-align:center;font-size:12px;color:var(--sub);height:20px}
+kbd{background:var(--sub);color:var(--bg);border-radius:4px;padding:1px 6px;font:inherit;font-size:11px}
+/* result */
+#result{display:none;flex-direction:column;gap:18px}
+body.done #result{display:flex}
+body.done #test{display:none}
+.rtop{display:grid;grid-template-columns:190px 1fr;gap:24px;align-items:stretch}
+.big .k{font-size:22px;color:var(--sub);line-height:1}
+.big .v{font-size:68px;color:var(--main);line-height:1.05;margin-bottom:10px}
+canvas{width:100%;height:230px;display:block}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+.stats .k{font-size:13px;color:var(--sub)}
+.stats .v{font-size:26px;color:var(--main);margin-top:2px}
+.stats .v small{font-size:13px;color:var(--sub)}
+#pb{text-align:center;font-size:13px;color:var(--sub);height:18px}
+#pb b{color:var(--main)}
+.ract{display:flex;justify-content:center;gap:10px}
+/* profile */
+#profile{display:none;flex-direction:column;gap:16px;overflow-y:auto;height:100%;padding:14px 6px 10px}
+body.profile #profile{display:flex}
+body.profile #test,body.profile #result,body.profile #config{display:none}
+body.profile main{justify-content:flex-start}
+.pcard{background:var(--panel);border-radius:12px;padding:16px 20px}
+.k{font-size:13px;color:var(--sub)}
+.phead{display:flex;align-items:center;gap:18px}
+.avatar{width:64px;height:64px;border-radius:50%;background:var(--sub);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;flex:none}
+#pName{font:inherit;font-size:26px;color:var(--text);background:none;border:0;outline:0;width:14ch;border-bottom:2px solid transparent;-webkit-user-select:text;user-select:text}
+#pName:hover,#pName:focus{border-bottom-color:var(--sub)}
+.ptri{margin-left:auto;display:flex;gap:36px}
+.ptri .v,.pgrid .v{font-size:26px;color:var(--text);margin-top:2px}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 20px}
+.pbs{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pbrow{margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center}
+.pbrow .v{font-size:30px;color:var(--main);line-height:1.2}
+.pbrow .a{font-size:14px;color:var(--text);opacity:.7}
+#pChart{height:200px;margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+th{color:var(--sub);font-weight:400;text-align:left;padding:5px 6px}
+td{padding:5px 6px;border-top:1px solid var(--bg)}
+td.w{color:var(--main)}
+.empty{color:var(--sub);font-size:13px;padding:10px 0}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="fade">
+    <div class="logo">type<b>speed</b></div>
+    <div class="hbtns">
+      <button id="bProf">профиль</button>
+      <button id="bTheme">тема</button>
+    </div>
+  </header>
+
+  <div id="config" class="fade"><div class="bar">
+    <button data-k="punct">@ знаки</button>
+    <button data-k="nums"># цифры</button>
+    <span class="sep"></span>
+    <button data-mode="time">время</button>
+    <button data-mode="words">слова</button>
+    <span class="sep"></span>
+    <span id="amounts"></span>
+    <span class="sep"></span>
+    <button data-lang="ru">русский</button>
+    <button data-lang="en">english</button>
+    <span class="sep"></span>
+    <span id="pools"></span>
+  </div></div>
+
+  <main>
+    <div id="test">
+      <div id="live"><span id="lCount"></span><span id="lWpm" class="dim"></span></div>
+      <div id="wordsWrap"><div id="words"><div id="caret" class="blink"></div></div></div>
+      <div id="hint"></div>
+      <div id="restartRow" class="fade"><button id="bRestart" title="Tab">↻ заново</button></div>
+    </div>
+
+    <div id="result">
+      <div class="rtop">
+        <div class="big">
+          <div class="k">wpm</div><div class="v" id="rWpm">0</div>
+          <div class="k">точность</div><div class="v" id="rAcc">0%</div>
+        </div>
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="stats">
+        <div><div class="k">тест</div><div class="v" id="rType" style="font-size:16px;line-height:1.3"></div></div>
+        <div><div class="k">raw</div><div class="v" id="rRaw"></div></div>
+        <div><div class="k">зн/мин</div><div class="v" id="rCpm"></div></div>
+        <div><div class="k" title="верные / ошибки / лишние / пропущенные">символы</div><div class="v" id="rChars" style="font-size:20px;line-height:1.5"></div></div>
+        <div><div class="k">стабильность</div><div class="v" id="rCons"></div></div>
+        <div><div class="k">время</div><div class="v" id="rTime"></div></div>
+      </div>
+      <div id="pb"></div>
+      <div class="ract">
+        <button id="bNext">→ следующий тест</button>
+        <button id="bRepeat">↻ повторить этот</button>
+      </div>
+    </div>
+
+    <div id="profile">
+      <div class="pcard phead">
+        <div class="avatar" id="pAv"></div>
+        <div><input id="pName" maxlength="16" spellcheck="false" autocomplete="off"><div class="k" id="pSince"></div></div>
+        <div class="ptri">
+          <div><div class="k">тестов начато</div><div class="v" id="pStarted"></div></div>
+          <div><div class="k">тестов завершено</div><div class="v" id="pDone"></div></div>
+          <div><div class="k">время печати</div><div class="v" id="pTime"></div></div>
+        </div>
+      </div>
+      <div class="pbs">
+        <div class="pcard"><div class="k">рекорды - время</div><div class="pbrow" id="pbTime"></div></div>
+        <div class="pcard"><div class="k">рекорды - слова</div><div class="pbrow" id="pbWords"></div></div>
+      </div>
+      <div class="pcard pgrid" id="pStats"></div>
+      <div class="pcard"><div class="k">wpm по тестам (точки - тесты, линия - среднее за 10)</div><canvas id="pChart"></canvas></div>
+      <div class="pcard"><div class="k">история тестов</div><div id="histBody"></div></div>
+      <div class="ract"><button id="bBack">← к тесту</button><button id="bReset">сбросить статистику</button></div>
+    </div>
+  </main>
+
+  <footer class="fade"><kbd>tab</kbd> или <kbd>esc</kbd> - заново &nbsp;·&nbsp; <kbd>⌥</kbd>+<kbd>⌫</kbd> - стереть слово</footer>
+</div>
+
+
+<script src="words.js"></script>
+<script>
+const POOLS={ru:["200","1k","2k"],en:["200","1k","2k"]}, poolCache={};
+function poolName(){const p=cfg.pool[cfg.lang];return POOLS[cfg.lang].includes(p)?p:"200"}
+function pool(){
+  const n=poolName(), id=cfg.lang+n;
+  if(!poolCache[id]) poolCache[id]=POOL_DATA[cfg.lang][n].split(" ");
+  return poolCache[id];
+}
+const langKey=()=>cfg.lang+(poolName()==="200"?"":poolName());
+const langLabel=()=>(cfg.lang==="ru"?"русский":"english")+(poolName()==="200"?"":" "+poolName());
+const AMOUNTS={time:[15,30,60,120],words:[10,25,50,100]};
+const THEMES=[["graphite",1],["ocean",1],["matrix",1],["paper",0]];
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const DB=(()=>{
+  if(window.__saved&&typeof window.__saved==="object") return window.__saved;
+  try{const v=localStorage.getItem("ts.db"); if(v) return JSON.parse(v)}catch(e){}
+  const o={}; for(const k of ["ts.cfg","ts.pb","ts.hist"]){try{const v=localStorage.getItem(k); if(v!=null)o[k]=JSON.parse(v)}catch(e){}}
+  return o;
+})();
+const store={get(k,d){return k in DB?DB[k]:d},
+  set(k,v){DB[k]=v; const j=JSON.stringify(DB);
+    try{localStorage.setItem("ts.db",j)}catch(e){}
+    try{window.webkit.messageHandlers.native.postMessage({save:j})}catch(e){}}};
+function prof(){return Object.assign({name:"user",created:Date.now(),started:0,completed:0,time:0},store.get("ts.prof",{}))}
+function bump(f){const p=prof(); f(p); store.set("ts.prof",p)}
+
+let cfg=Object.assign({mode:"time",time:30,words:25,lang:"ru",punct:false,nums:false,theme:"graphite"},store.get("ts.cfg",{}));
+cfg.pool=Object.assign({ru:"200",en:"200"},cfg.pool);
+let S={};            // состояние теста
+let lineH=0, lastWords=null;
+const wordsEl=$("#words"), caret=$("#caret"), wrap=$("#wordsWrap"), hint=$("#hint");
+
+/* ---------- генерация ---------- */
+const rnd=n=>Math.floor(Math.random()*n);
+function genWords(n,prev){
+  const list=pool(), out=[]; let last=prev||"", cap=!prev;
+  for(let i=0;i<n;i++){
+    let w; do{w=list[rnd(list.length)]}while(w===last); last=w;
+    if(cfg.nums && Math.random()<.1) w=String(rnd(Math.random()<.5?100:10000));
+    if(cfg.punct){
+      if(cap) w=w[0].toUpperCase()+w.slice(1);
+      cap=false; const r=Math.random();
+      if(r<.12){w+=".";cap=true} else if(r<.22) w+=","; else if(r<.25){w+="?";cap=true}
+      else if(r<.28){w+="!";cap=true} else if(r<.30) w+=":"; else if(r<.32) w='"'+w+'"'; else if(r<.34) w="("+w+")";
+    }
+    out.push(w);
+  }
+  return out;
+}
+
+/* ---------- отрисовка ---------- */
+function wordHTML(i){
+  const w=S.words[i], inp=S.input[i]||"", done=i<S.wi; let h="";
+  for(let j=0;j<w.length;j++){
+    const c=j<inp.length?(inp[j]===w[j]?"ok":"no"):"";
+    h+=`<span class="l ${c}">${esc(w[j])}</span>`;
+  }
+  for(let j=w.length;j<inp.length;j++) h+=`<span class="l ex">${esc(inp[j])}</span>`;
+  return h;
+}
+const esc=c=>c==="<"?"&lt;":c==="&"?"&amp;":c;
+function appendWords(from){
+  const f=document.createDocumentFragment();
+  for(let i=from;i<S.words.length;i++){
+    const d=document.createElement("div"); d.className="word"; d.innerHTML=wordHTML(i); f.appendChild(d); S.els.push(d);
+  }
+  wordsEl.appendChild(f);
+}
+const PER_LINE=5;
+function layoutBreaks(){
+  $$("#words .br").forEach(e=>e.remove());
+  const el=S.els[0]; if(!el) return;
+  const gap=parseFloat(getComputedStyle(el).marginLeft)*2, W=wordsEl.clientWidth-1;
+  const ws=S.els.map(e=>e.getBoundingClientRect().width+gap);
+  let n=0, w=0;
+  S.els.forEach((e,i)=>{
+    if(n&&(n>=PER_LINE||w+ws[i]>W)){const b=document.createElement("div");b.className="br";wordsEl.insertBefore(b,e);n=0;w=0}
+    n++; w+=ws[i];
+  });
+}
+function measure(){
+  layoutBreaks();
+  const el=S.els[0]; if(!el) return; const cs=getComputedStyle(el);
+  lineH=el.offsetHeight+parseFloat(cs.marginTop)+parseFloat(cs.marginBottom);
+  wrap.style.height=lineH*3+"px";
+}
+function placeCaret(){
+  const el=S.els[S.wi]; if(!el) return; const n=(S.input[S.wi]||"").length, ls=el.children;
+  let x,y;
+  if(n<ls.length){x=ls[n].offsetLeft;y=ls[n].offsetTop}
+  else{const l=ls[ls.length-1];x=l.offsetLeft+l.offsetWidth;y=l.offsetTop}
+  caret.style.left=(x-1)+"px"; caret.style.top=(y+1)+"px";
+  const shift=Math.max(0,el.offsetTop-parseFloat(getComputedStyle(el).marginTop)-lineH);
+  wordsEl.style.transform=`translateY(${-shift}px)`;
+}
+
+/* ---------- тест ---------- */
+function newTest(repeat){
+  clearInterval(S.timer);
+  if(S.started&&!S.finished){const t=elapsed();bump(p=>p.time+=t)}
+  const n=cfg.mode==="words"?cfg.words:120;
+  const words=repeat&&lastWords?lastWords.slice():genWords(n);
+  S={words,input:[""],wi:0,els:[],started:false,finished:false,t0:0,keys:0,okKeys:0,secKeys:0,secErr:0,samples:[],timer:null,repeat:!!repeat};
+  lastWords=words.slice();
+  $$("#words .word").forEach(e=>e.remove());
+  appendWords(0); measure();
+  document.body.classList.remove("typing","done");
+  caret.classList.add("blink"); hint.textContent="";
+  updateLive(0); placeCaret();
+}
+function start(){
+  S.started=true; S.t0=performance.now(); S.nextSec=1; bump(p=>p.started++);
+  document.body.classList.add("typing"); caret.classList.remove("blink");
+  S.timer=setInterval(tick,50);
+}
+function elapsed(){return (performance.now()-S.t0)/1000}
+function correctSoFar(){
+  let c=0;
+  for(let i=0;i<S.wi;i++) if(S.input[i]===S.words[i]) c+=S.words[i].length+1;
+  const w=S.words[S.wi]||"", inp=S.input[S.wi]||"";
+  if(w.startsWith(inp)) c+=inp.length;
+  return c;
+}
+function tick(){
+  const t=elapsed();
+  while(t>=S.nextSec){
+    S.samples.push({wpm:correctSoFar()/5/(S.nextSec/60),raw:S.secKeys*12,err:S.secErr});
+    S.secKeys=0;S.secErr=0;S.nextSec++;
+  }
+  updateLive(t);
+  if(cfg.mode==="time"&&t>=cfg.time) finish(cfg.time);
+}
+function updateLive(t){
+  $("#lCount").textContent=cfg.mode==="time"?Math.max(0,Math.ceil(cfg.time-t)):`${S.wi}/${S.words.length}`;
+  $("#lWpm").textContent=t>1?Math.round(correctSoFar()/5/(t/60))+" wpm":"";
+}
+function typeChar(ch){
+  if(!S.started) start();
+  const w=S.words[S.wi], inp=S.input[S.wi];
+  if(inp.length>=w.length+12) return;
+  const exp=w[inp.length], ok=ch===exp;
+  S.keys++;S.secKeys++; if(ok)S.okKeys++; else S.secErr++;
+  S.input[S.wi]=inp+ch;
+  S.els[S.wi].innerHTML=wordHTML(S.wi);
+  layoutHint(ch,exp);
+  placeCaret();
+  if(cfg.mode==="words"&&S.wi===S.words.length-1&&S.input[S.wi]===w) finish();
+}
+function space(){
+  if(!S.started||!S.input[S.wi]) return;
+  const ok=S.input[S.wi]===S.words[S.wi];
+  S.keys++;S.secKeys++; if(ok)S.okKeys++; else S.secErr++;
+  S.els[S.wi].classList.toggle("bad",!ok);
+  if(cfg.mode==="words"&&S.wi===S.words.length-1){finish();return}
+  S.wi++; S.input[S.wi]="";
+  if(S.wi>S.words.length-50&&cfg.mode==="time"){
+    const from=S.words.length; S.words.push(...genWords(80,S.words[from-1])); appendWords(from); layoutBreaks();
+  }
+  placeCaret();
+}
+function backspace(whole){
+  if(!S.started) return;
+  const inp=S.input[S.wi];
+  if(inp){
+    S.input[S.wi]=whole?"":inp.slice(0,-1);
+    S.els[S.wi].innerHTML=wordHTML(S.wi);
+  }else if(S.wi>0&&S.input[S.wi-1]!==S.words[S.wi-1]){
+    S.wi--; S.els[S.wi].classList.remove("bad");
+    if(whole){S.input[S.wi]="";S.els[S.wi].innerHTML=wordHTML(S.wi)}
+  }
+  placeCaret();
+}
+const isCyr=c=>/[а-яё]/i.test(c), isLat=c=>/[a-z]/i.test(c);
+function layoutHint(ch,exp){
+  if(!exp) return;
+  if((isCyr(exp)&&isLat(ch))||(isLat(exp)&&isCyr(ch))) hint.textContent="похоже, включена не та раскладка";
+  else if(hint.dataset.caps!=="1") hint.textContent="";
+}
+
+/* ---------- результат ---------- */
+function finish(fixedT){
+  if(S.finished) return; S.finished=true; clearInterval(S.timer);
+  const t=fixedT||elapsed(), min=t/60;
+  let cor=0,inc=0,ext=0,mis=0,corWord=0;
+  const lastI=S.wi;
+  for(let i=0;i<=lastI;i++){
+    const w=S.words[i], inp=S.input[i]||"", cur=i===lastI, timed=cfg.mode==="time"&&cur;
+    for(let j=0;j<Math.max(w.length,inp.length);j++){
+      if(j>=w.length) ext++; else if(j>=inp.length){ if(!timed) mis++ } else if(inp[j]===w[j]) cor++; else inc++;
+    }
+    if(inp===w) corWord+=w.length+(cur?0:1); else if(timed&&w.startsWith(inp)) corWord+=inp.length;
+  }
+  const spaces=lastI;
+  const wpm=corWord/5/min, raw=(cor+inc+ext+spaces)/5/min;
+  const acc=S.keys?S.okKeys/S.keys*100:0;
+  const frac=t-Math.floor(t);
+  if(frac>.5||!S.samples.length) S.samples.push({wpm,raw:S.secKeys*12/(frac||1),err:S.secErr});
+  S.samples[S.samples.length-1].wpm=wpm;
+  const raws=S.samples.map(s=>s.raw), mean=raws.reduce((a,b)=>a+b,0)/raws.length||0;
+  const sd=Math.sqrt(raws.reduce((a,b)=>a+(b-mean)**2,0)/raws.length||0);
+  const cons=mean?Math.max(0,Math.min(100,100-sd/mean*100)):0;
+
+  bump(p=>{p.completed++;p.time+=t});
+  const amount=cfg.mode==="time"?cfg.time:cfg.words;
+  const key=[cfg.mode,amount,langKey(),+cfg.punct,+cfg.nums].join("-");
+  $("#rWpm").textContent=Math.round(wpm); $("#rWpm").title=wpm.toFixed(2)+" wpm";
+  $("#rAcc").textContent=Math.floor(acc)+"%"; $("#rAcc").title=acc.toFixed(2)+"%";
+  $("#rRaw").textContent=Math.round(raw);
+  $("#rCpm").textContent=Math.round(corWord/min);
+  $("#rChars").textContent=`${cor}/${inc}/${ext}/${mis}`;
+  $("#rCons").textContent=Math.round(cons)+"%";
+  $("#rTime").innerHTML=Math.round(t)+"<small> с</small>";
+  $("#rType").innerHTML=`${cfg.mode==="time"?"время":"слова"} ${amount}<br>${langLabel()}${cfg.punct?"<br>знаки":""}${cfg.nums?"<br>цифры":""}`;
+
+  const pbs=store.get("ts.pb",{}), old=pbs[key]; let pbText="";
+  const valid=acc>=50&&wpm>0;
+  if(valid&&!S.repeat){
+    if(!old||wpm>old){pbs[key]=+wpm.toFixed(2);store.set("ts.pb",pbs);
+      pbText=old?`<b>новый рекорд!</b> было ${Math.round(old)} wpm`:`<b>первый результат в этом режиме</b>`}
+    else pbText=`рекорд в этом режиме: <b>${Math.round(old)}</b> wpm`;
+    const h=store.get("ts.hist",[]);
+    h.unshift({d:Date.now(),wpm:+wpm.toFixed(1),acc:+acc.toFixed(1),raw:Math.round(raw),cons:Math.round(cons),t:Math.round(t),chars:[cor,inc,ext,mis],key});
+    store.set("ts.hist",h.slice(0,5000));
+  }else if(S.repeat) pbText="повтор теста - в историю не записан";
+  else pbText="слишком низкая точность - результат не засчитан";
+  $("#pb").innerHTML=pbText;
+
+  document.body.classList.remove("typing"); document.body.classList.add("done");
+  drawChart();
+}
+function css(v){return getComputedStyle(document.body).getPropertyValue(v).trim()}
+function drawChart(){
+  const cv=$("#chart"), dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  if(!W||!S.samples) return;
+  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext("2d"); g.scale(dpr,dpr); g.clearRect(0,0,W,H);
+  const d=S.samples, n=d.length, pl=38, pr=12, pt=10, pb=24;
+  const max=Math.max(20,...d.map(s=>Math.max(s.wpm,s.raw)))*1.1;
+  const step=[10,20,40,50,100,200,500,1000].find(x=>max/x<=6)||2000;
+  const X=i=>n===1?pl+(W-pl-pr)/2:pl+(W-pl-pr)*i/(n-1), Y=v=>pt+(H-pt-pb)*(1-v/max);
+  const sub=css("--sub"), main=css("--main"), err=css("--err");
+  g.font="11px ui-monospace,Menlo,monospace"; g.fillStyle=sub; g.strokeStyle=sub; g.lineWidth=1;
+  g.textAlign="right"; g.textBaseline="middle";
+  for(let v=0;v<=max;v+=step){g.globalAlpha=.18;g.beginPath();g.moveTo(pl,Y(v));g.lineTo(W-pr,Y(v));g.stroke();g.globalAlpha=1;g.fillText(v,pl-8,Y(v))}
+  g.textAlign="center"; g.textBaseline="top";
+  const xs=Math.max(1,Math.ceil(n/12));
+  for(let i=0;i<n;i+=xs) g.fillText(i+1,X(i),H-pb+8);
+  const line=(k,col,w)=>{g.strokeStyle=col;g.lineWidth=w;g.lineJoin="round";g.beginPath();d.forEach((s,i)=>i?g.lineTo(X(i),Y(s[k])):g.moveTo(X(i),Y(s[k])));g.stroke()};
+  line("raw",sub,2);
+  g.globalAlpha=.12;g.fillStyle=main;g.beginPath();g.moveTo(X(0),Y(0));d.forEach((s,i)=>g.lineTo(X(i),Y(s.wpm)));g.lineTo(X(n-1),Y(0));g.fill();g.globalAlpha=1;
+  line("wpm",main,2.5);
+  g.fillStyle=main; d.forEach((s,i)=>{g.beginPath();g.arc(X(i),Y(s.wpm),n>40?1.5:3,0,7);g.fill()});
+  g.strokeStyle=err; g.lineWidth=1.5;
+  d.forEach((s,i)=>{if(!s.err)return;const x=X(i),y=pt+6,r=3;g.beginPath();g.moveTo(x-r,y-r);g.lineTo(x+r,y+r);g.moveTo(x+r,y-r);g.lineTo(x-r,y+r);g.stroke()});
+}
+
+/* ---------- профиль ---------- */
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+function fmtTime(sec){sec=Math.round(sec);const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),x=sec%60;return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(x).padStart(2,"0")}`}
+function modeLabel(key){const [m,a,l,p,n]=key.split("-");return `${m==="time"?"время":"слова"} ${a} · ${l}${+p?" · @":""}${+n?" · #":""}`}
+function renderProfile(){
+  const h=store.get("ts.hist",[]), p=prof();
+  $("#pName").value=p.name; $("#pAv").textContent=(p.name.trim()[0]||"?").toUpperCase();
+  $("#pSince").textContent="в игре с "+new Date(p.created).toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"});
+  $("#pStarted").textContent=p.started;
+  $("#pDone").innerHTML=p.completed+(p.started?` <small class="k">${Math.round(p.completed/p.started*100)}%</small>`:"");
+  $("#pTime").textContent=fmtTime(p.time);
+  const pbRow=(m)=>AMOUNTS[m].map(a=>{
+    const r=h.filter(x=>x.key.startsWith(m+"-"+a+"-")).sort((x,y)=>y.wpm-x.wpm)[0];
+    return `<div title="${r?modeLabel(r.key)+" · "+new Date(r.d).toLocaleDateString("ru-RU"):""}"><div class="k">${a}${m==="time"?" с":" слов"}</div><div class="v">${r?Math.round(r.wpm):"-"}</div><div class="a">${r?Math.floor(r.acc)+"%":"-"}</div></div>`}).join("");
+  $("#pbTime").innerHTML=pbRow("time"); $("#pbWords").innerHTML=pbRow("words");
+  const col=(k)=>h.map(x=>x[k]).filter(v=>typeof v==="number"), l10=(k)=>h.slice(0,10).map(x=>x[k]).filter(v=>typeof v==="number");
+  const cell=(k,v,u)=>`<div><div class="k">${k}</div><div class="v">${h.length&&isFinite(v)?Math.round(v)+(u||""):"-"}</div></div>`;
+  const tri=(name,k,u,bestName)=>cell(bestName+" "+name,Math.max(...col(k)),u)+cell("средн. "+name,avg(col(k)),u)+cell("средн. "+name+" (посл. 10)",avg(l10(k)),u);
+  $("#pStats").innerHTML=tri("wpm","wpm","","лучший")+tri("raw","raw","","лучший")+tri("точность","acc","%","лучшая")+tri("стабильность","cons","%","лучшая");
+  const b=$("#histBody");
+  if(!h.length) b.innerHTML='<div class="empty">пока пусто - пройди первый тест</div>';
+  else b.innerHTML="<table><tr><th>wpm</th><th>raw</th><th>точность</th><th>стабильн.</th><th>символы</th><th>режим</th><th>когда</th></tr>"+h.slice(0,200).map(r=>{
+    const dt=new Date(r.d);
+    return `<tr><td class="w">${r.wpm.toFixed(1)}</td><td>${r.raw}</td><td>${r.acc.toFixed(1)}%</td><td>${r.cons!=null?r.cons+"%":"-"}</td><td>${r.chars?r.chars.join("/"):"-"}</td><td>${modeLabel(r.key)}</td><td>${dt.toLocaleDateString("ru-RU",{day:"numeric",month:"short"})}, ${dt.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}</td></tr>`}).join("")+"</table>"+(h.length>200?`<div class="empty">показаны последние 200 из ${h.length}</div>`:"");
+  drawProfChart(h);
+}
+function drawProfChart(h){
+  const cv=$("#pChart"), dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight; if(!W) return;
+  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext("2d"); g.scale(dpr,dpr); g.clearRect(0,0,W,H);
+  const d=h.slice(0,150).reverse().map(x=>x.wpm), n=d.length, sub=css("--sub"), main=css("--main");
+  g.font="11px ui-monospace,Menlo,monospace"; g.fillStyle=sub;
+  if(!n){g.textAlign="center";g.fillText("нет данных",W/2,H/2);return}
+  const pl=38,pr=12,pt=10,pb=12, max=Math.max(20,...d)*1.1, step=[10,20,40,50,100,200,500,1000].find(x=>max/x<=6)||2000;
+  const X=i=>n===1?pl+(W-pl-pr)/2:pl+(W-pl-pr)*i/(n-1), Y=v=>pt+(H-pt-pb)*(1-v/max);
+  g.strokeStyle=sub; g.lineWidth=1; g.textAlign="right"; g.textBaseline="middle";
+  for(let v=0;v<=max;v+=step){g.globalAlpha=.18;g.beginPath();g.moveTo(pl,Y(v));g.lineTo(W-pr,Y(v));g.stroke();g.globalAlpha=1;g.fillText(v,pl-8,Y(v))}
+  g.fillStyle=sub; d.forEach((v,i)=>{g.beginPath();g.arc(X(i),Y(v),2.5,0,7);g.fill()});
+  g.strokeStyle=main; g.lineWidth=2.5; g.lineJoin="round"; g.beginPath();
+  d.forEach((v,i)=>{const m=avg(d.slice(Math.max(0,i-9),i+1)); i?g.lineTo(X(i),Y(m)):g.moveTo(X(i),Y(m))}); g.stroke();
+}
+function openProfile(){document.body.classList.add("profile");renderProfile();$("#profile").scrollTop=0}
+function closeProfile(){
+  document.body.classList.remove("profile"); $("#pName").blur(); resetArm(false);
+  measure(); placeCaret(); if(S.finished) drawChart();
+}
+let armed=false;
+function resetArm(v){armed=v;$("#bReset").textContent=v?"точно удалить всё? нажми ещё раз":"сбросить статистику";$("#bReset").style.color=v?"var(--err)":""}
+$("#bProf").onclick=e=>{e.target.blur();document.body.classList.contains("profile")?closeProfile():openProfile()};
+$("#bBack").onclick=e=>{e.target.blur();closeProfile()};
+$("#bReset").onclick=e=>{e.target.blur();
+  if(!armed){resetArm(true);return}
+  const p=prof(); store.set("ts.hist",[]); store.set("ts.pb",{}); store.set("ts.prof",{name:p.name,created:p.created,started:0,completed:0,time:0});
+  resetArm(false); renderProfile();
+};
+$("#pName").addEventListener("input",e=>{const v=e.target.value;bump(p=>p.name=v.trim()||"user");$("#pAv").textContent=(v.trim()[0]||"?").toUpperCase()});
+
+/* ---------- настройки ---------- */
+function applyTheme(){
+  document.body.dataset.theme=cfg.theme;
+  const t=THEMES.find(x=>x[0]===cfg.theme)||THEMES[0];
+  try{window.webkit.messageHandlers.native.postMessage({bg:css("--bg"),dark:!!t[1]})}catch(e){}
+}
+function syncUI(){
+  $$("[data-k]").forEach(b=>b.classList.toggle("on",cfg[b.dataset.k]));
+  $$("[data-mode]").forEach(b=>b.classList.toggle("on",cfg.mode===b.dataset.mode));
+  $$("[data-lang]").forEach(b=>b.classList.toggle("on",cfg.lang===b.dataset.lang));
+  $("#amounts").innerHTML=AMOUNTS[cfg.mode].map(a=>`<button data-a="${a}" class="${cfg[cfg.mode]===a?"on":""}">${a}</button>`).join("");
+  $("#pools").innerHTML=POOLS[cfg.lang].map(p=>`<button data-p="${p}" class="${poolName()===p?"on":""}" title="${p==='200'?'200 самых частых слов':'самые частые слова: '+p}">${p}</button>`).join("");
+  store.set("ts.cfg",cfg);
+}
+$("#config").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return; const d=b.dataset;
+  if(d.k) cfg[d.k]=!cfg[d.k]; else if(d.mode) cfg.mode=d.mode; else if(d.lang) cfg.lang=d.lang; else if(d.a) cfg[cfg.mode]=+d.a; else if(d.p) cfg.pool[cfg.lang]=d.p;
+  b.blur(); syncUI(); newTest();
+});
+$("#bTheme").onclick=e=>{const i=THEMES.findIndex(x=>x[0]===cfg.theme);cfg.theme=THEMES[(i+1)%THEMES.length][0];store.set("ts.cfg",cfg);applyTheme();e.target.blur();if(document.body.classList.contains("profile"))drawProfChart(store.get("ts.hist",[]));else if(S.finished)drawChart()};
+$("#bRestart").onclick=$("#bNext").onclick=e=>{e.target.blur();newTest()};
+$("#bRepeat").onclick=e=>{e.target.blur();newTest(true)};
+
+/* ---------- клавиатура ---------- */
+document.addEventListener("keydown",e=>{
+  if(e.metaKey||e.ctrlKey) return;
+  if(e.target.id==="pName"){ if(e.key==="Enter"||e.key==="Escape"||e.key==="Tab"){e.preventDefault();e.target.blur()} return }
+  if(document.body.classList.contains("profile")){ if(e.key==="Escape"||e.key==="Tab"){e.preventDefault();closeProfile()} return }
+  const caps=e.getModifierState&&e.getModifierState("CapsLock");
+  hint.dataset.caps=caps?"1":"0"; if(caps&&!S.finished) hint.textContent="включен caps lock"; else if(hint.textContent==="включен caps lock") hint.textContent="";
+  if(e.key==="Tab"||e.key==="Escape"){e.preventDefault();newTest();return}
+  if(S.finished){ if(e.key==="Enter"){e.preventDefault();newTest()} return }
+  if(e.key==="Backspace"){e.preventDefault();backspace(e.altKey);return}
+  if(e.key===" "){e.preventDefault();space();return}
+  if(e.key.length===1&&!e.isComposing){e.preventDefault();typeChar(e.key)}
+});
+window.addEventListener("resize",()=>{if(document.body.classList.contains("profile")){drawProfChart(store.get("ts.hist",[]));return}measure();placeCaret();if(S.finished)drawChart()});
+
+applyTheme(); syncUI(); newTest();
+</script>
+</body>
+</html>
