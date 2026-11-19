@@ -1,7 +1,7 @@
 import Cocoa
 import WebKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
+final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKNavigationDelegate {
     var window: NSWindow!
     var webView: WKWebView!
 
@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
         webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1100, height: 700), configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
+        webView.navigationDelegate = self
 
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 700),
@@ -41,24 +42,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         window.titlebarAppearsTransparent = true
         window.backgroundColor = NSColor(srgbRed: 0.169, green: 0.176, blue: 0.192, alpha: 1)
         window.appearance = NSAppearance(named: .darkAqua)
-        window.minSize = NSSize(width: 820, height: 560)
+        window.minSize = NSSize(width: 860, height: 600)
         window.isReleasedWhenClosed = false
         window.contentView = webView
         window.center()
         window.setFrameAutosaveName("TypeSpeedMain")
 
-        if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
-            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        }
+        loadPage()
 
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(webView)
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func loadPage() {
+        if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return true
     }
+
+    // Перед выходом забираем у страницы свежие данные и пишем на диск
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard webView != nil else { return .terminateNow }
+        var done = false
+        let finish = { if !done { done = true; NSApp.reply(toApplicationShouldTerminate: true) } }
+        webView.evaluateJavaScript("typeof DB==='object'?JSON.stringify(DB):null") { [weak self] result, _ in
+            if let self = self, let json = result as? String, let data = json.data(using: .utf8) {
+                try? data.write(to: self.dataURL, options: .atomic)
+            }
+            finish()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { finish() }
+        return .terminateLater
+    }
+
+    // Если процесс страницы упал - перезагружаем ее с сохраненными данными
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        let ucc = webView.configuration.userContentController
+        ucc.removeAllUserScripts()
+        if let data = try? Data(contentsOf: dataURL), let json = String(data: data, encoding: .utf8),
+           (try? JSONSerialization.jsonObject(with: data)) != nil {
+            ucc.addUserScript(WKUserScript(source: "window.__saved = " + json + ";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
+        loadPage()
+    }
+
+    @objc func showTest(_ sender: Any?) { webView.evaluateJavaScript("window.go&&go('test')") }
+    @objc func showProfile(_ sender: Any?) { webView.evaluateJavaScript("window.go&&go('profile')") }
+    @objc func showSettings(_ sender: Any?) { webView.evaluateJavaScript("window.go&&go('settings')") }
 
     // Страница присылает данные для сохранения и цвет темы для заголовка окна
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -94,11 +129,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "О программе TypeSpeed", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
+        let settings = NSMenuItem(title: "Настройки…", action: #selector(showSettings(_:)), keyEquivalent: ",")
+        settings.target = self
+        appMenu.addItem(settings)
+        appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Скрыть TypeSpeed", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Завершить TypeSpeed", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)
+
+        // Правка - чтобы в полях (имя, свое время) работали ⌘C / ⌘V / ⌘A
+        let editItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Правка")
+        editMenu.addItem(withTitle: "Отменить", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(withTitle: "Вырезать", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Копировать", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Вставить", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Выбрать все", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = editMenu
+        main.addItem(editItem)
+
+        let viewItem = NSMenuItem()
+        let viewMenu = NSMenu(title: "Вид")
+        for (title, sel, key) in [("Тест", #selector(showTest(_:)), "1"), ("Профиль", #selector(showProfile(_:)), "2"), ("Настройки", #selector(showSettings(_:)), "3")] {
+            let item = NSMenuItem(title: title, action: sel, keyEquivalent: key)
+            item.target = self
+            viewMenu.addItem(item)
+        }
+        viewItem.submenu = viewMenu
+        main.addItem(viewItem)
 
         let winItem = NSMenuItem()
         let winMenu = NSMenu(title: "Окно")
